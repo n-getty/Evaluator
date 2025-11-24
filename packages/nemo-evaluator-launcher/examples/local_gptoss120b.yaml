@@ -33,7 +33,7 @@ execution:
 target:
   api_endpoint:
     model_id: oss120
-    url: http://66.55.67.65/v1/chat/completions
+    url: ENDPOINT_URL
     api_key_name: OPENAI_API_KEY
 
 # specify the benchmarks to evaluate
