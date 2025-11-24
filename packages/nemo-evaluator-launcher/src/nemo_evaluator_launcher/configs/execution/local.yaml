@@ -17,5 +17,5 @@ type: local
 output_dir: ???
 extra_docker_args: ""
 mode: sequential
-container_runtime: docker
-apptainer_image_cache_dir: null
+container_runtime: apptainer
+apptainer_image_cache_dir: /eagle/projects/argonne_tpc/ngetty/dev/apptainer

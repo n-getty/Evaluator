@@ -178,7 +178,38 @@ else
 
         {% if container_runtime == "apptainer" %}
         # Apptainer client
-        apptainer run --nv \
+        
+        # Prepare a script file on the host (in artifacts dir) to avoid quoting hell and path issues
+        # The artifacts dir is mounted to /results in the container
+        cat << 'CONTAINER_SCRIPT' > "$artifacts_dir/entrypoint.sh"
+#!/bin/bash
+# Critical: Add the venv path where eval-factory lives
+export PATH=$PATH:/opt/venv/bin
+
+# Critical: Prevent proxy from intercepting localhost traffic (fixes Squid 404/Connection Refused)
+export no_proxy="localhost,127.0.0.1,::1,${no_proxy}"
+export NO_PROXY="localhost,127.0.0.1,::1,${NO_PROXY}"
+
+# Ensure we are in the results directory so generated files (pre_cmd.sh) are writable
+cd /results
+
+{{ task.eval_factory_command }}
+
+exit_code=$?
+chmod 777 -R /results || true
+
+if [ "$exit_code" -ne 0 ]; then
+    echo "The evaluation container failed with exit code $exit_code" >&2
+    exit "$exit_code"
+fi
+echo "Container completed successfully" >&2
+exit 0
+CONTAINER_SCRIPT
+
+        chmod +x "$artifacts_dir/entrypoint.sh"
+
+        # Use 'exec' instead of 'run' to bypass entrypoint issues
+        apptainer exec --nv \
           --bind "$artifacts_dir":/results \
           {% if task.dataset_mount_host and task.dataset_mount_container -%}
           --bind "{{ task.dataset_mount_host }}:{{ task.dataset_mount_container }}" \
@@ -187,17 +218,8 @@ else
           --env {{ env_var }} \
           {% endfor -%}
           "$EVAL_IMAGE" \
-          bash -c '
-            {{ task.eval_factory_command | indent(8) }} ;
-            exit_code=$?
-            chmod 777 -R /results;
-            if [ "$exit_code" -ne 0 ]; then
-                echo "The evaluation container failed with exit code $exit_code" >&2;
-                exit "$exit_code";
-            fi;
-            echo "Container completed successfully" >&2;
-            exit 0;
-          ' > "$logs_dir/client_stdout.log" 2>&1
+          /bin/bash /results/entrypoint.sh > "$logs_dir/client_stdout.log" 2>&1
+        
         {% else %}
         # Docker client
         docker run --rm --shm-size=100g {{ extra_docker_args }} \
