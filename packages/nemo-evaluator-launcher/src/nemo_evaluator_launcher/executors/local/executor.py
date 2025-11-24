@@ -89,12 +89,20 @@ class LocalExecutor(BaseExecutor):
         Raises:
             RuntimeError: If the run script fails.
         """
-        # Check if docker is available (skip in dry_run mode)
-        if not dry_run and shutil.which("docker") is None:
-            raise RuntimeError(
-                "Docker is not installed or not in PATH. "
-                "Please install Docker to run local evaluations."
-            )
+        container_runtime = cfg.execution.get("container_runtime", "docker")
+
+        # Check if runtime is available (skip in dry_run mode)
+        if not dry_run:
+            if container_runtime == "docker" and shutil.which("docker") is None:
+                raise RuntimeError(
+                    "Docker is not installed or not in PATH. "
+                    "Please install Docker to run local evaluations."
+                )
+            elif container_runtime == "apptainer" and shutil.which("apptainer") is None:
+                raise RuntimeError(
+                    "Apptainer is not installed or not in PATH. "
+                    "Please install Apptainer to run local evaluations."
+                )
 
         # Generate invocation ID for this evaluation run
         invocation_id = generate_invocation_id()
@@ -292,6 +300,9 @@ class LocalExecutor(BaseExecutor):
             endpoint_readiness_timeout = cfg.execution.get(
                 "endpoint_readiness_timeout", 600
             )
+            apptainer_image_cache_dir = cfg.execution.get(
+                "apptainer_image_cache_dir", None
+            )
 
             run_sh_content = (
                 run_template.render(
@@ -301,6 +312,8 @@ class LocalExecutor(BaseExecutor):
                     extra_docker_args=extra_docker_args,
                     endpoint_readiness_timeout=endpoint_readiness_timeout,
                     invocation_id=invocation_id,
+                    container_runtime=container_runtime,
+                    apptainer_image_cache_dir=apptainer_image_cache_dir,
                 ).rstrip("\n")
                 + "\n"
             )
@@ -321,6 +334,8 @@ class LocalExecutor(BaseExecutor):
                     extra_docker_args=extra_docker_args,
                     endpoint_readiness_timeout=endpoint_readiness_timeout,
                     invocation_id=invocation_id,
+                    container_runtime=container_runtime,
+                    apptainer_image_cache_dir=apptainer_image_cache_dir,
                 ).rstrip("\n")
                 + "\n"
             )

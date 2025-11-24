@@ -18,3 +18,5 @@ output_dir: ???
 extra_docker_args: ""
 mode: sequential
 endpoint_readiness_timeout: 600
+container_runtime: docker
+apptainer_image_cache_dir: null
