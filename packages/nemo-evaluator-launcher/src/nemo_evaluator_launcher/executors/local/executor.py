@@ -77,12 +77,20 @@ class LocalExecutor(BaseExecutor):
         Raises:
             RuntimeError: If the run script fails.
         """
-        # Check if docker is available (skip in dry_run mode)
-        if not dry_run and shutil.which("docker") is None:
-            raise RuntimeError(
-                "Docker is not installed or not in PATH. "
-                "Please install Docker to run local evaluations."
-            )
+        container_runtime = cfg.execution.get("container_runtime", "docker")
+
+        # Check if runtime is available (skip in dry_run mode)
+        if not dry_run:
+            if container_runtime == "docker" and shutil.which("docker") is None:
+                raise RuntimeError(
+                    "Docker is not installed or not in PATH. "
+                    "Please install Docker to run local evaluations."
+                )
+            elif container_runtime == "apptainer" and shutil.which("apptainer") is None:
+                raise RuntimeError(
+                    "Apptainer is not installed or not in PATH. "
+                    "Please install Apptainer to run local evaluations."
+                )
 
         # Generate invocation ID for this evaluation run
         invocation_id = generate_invocation_id()
@@ -278,12 +286,17 @@ class LocalExecutor(BaseExecutor):
             auto_export_destinations = auto_export_config.get("destinations", [])
 
             extra_docker_args = cfg.execution.get("extra_docker_args", "")
+            apptainer_image_cache_dir = cfg.execution.get(
+                "apptainer_image_cache_dir", None
+            )
 
             run_sh_content = (
                 run_template.render(
                     evaluation_tasks=[evaluation_task],
                     auto_export_destinations=auto_export_destinations,
                     extra_docker_args=extra_docker_args,
+                    container_runtime=container_runtime,
+                    apptainer_image_cache_dir=apptainer_image_cache_dir,
                 ).rstrip("\n")
                 + "\n"
             )
@@ -295,6 +308,8 @@ class LocalExecutor(BaseExecutor):
                 evaluation_tasks=evaluation_tasks,
                 auto_export_destinations=auto_export_destinations,
                 extra_docker_args=extra_docker_args,
+                container_runtime=container_runtime,
+                apptainer_image_cache_dir=apptainer_image_cache_dir,
             ).rstrip("\n")
             + "\n"
         )
