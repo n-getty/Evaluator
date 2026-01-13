@@ -86,10 +86,10 @@ class LocalExecutor(BaseExecutor):
                     "Docker is not installed or not in PATH. "
                     "Please install Docker to run local evaluations."
                 )
-            elif container_runtime == "apptainer" and shutil.which("apptainer") is None:
+            elif container_runtime == "podman-hpc" and shutil.which("podman-hpc") is None:
                 raise RuntimeError(
-                    "Apptainer is not installed or not in PATH. "
-                    "Please install Apptainer to run local evaluations."
+                    "podman-hpc is not installed or not in PATH. "
+                    "Please install podman-hpc to run local evaluations."
                 )
 
         # Generate invocation ID for this evaluation run
@@ -286,9 +286,6 @@ class LocalExecutor(BaseExecutor):
             auto_export_destinations = auto_export_config.get("destinations", [])
 
             extra_docker_args = cfg.execution.get("extra_docker_args", "")
-            apptainer_image_cache_dir = cfg.execution.get(
-                "apptainer_image_cache_dir", None
-            )
 
             run_sh_content = (
                 run_template.render(
@@ -296,7 +293,6 @@ class LocalExecutor(BaseExecutor):
                     auto_export_destinations=auto_export_destinations,
                     extra_docker_args=extra_docker_args,
                     container_runtime=container_runtime,
-                    apptainer_image_cache_dir=apptainer_image_cache_dir,
                 ).rstrip("\n")
                 + "\n"
             )
@@ -309,7 +305,6 @@ class LocalExecutor(BaseExecutor):
                 auto_export_destinations=auto_export_destinations,
                 extra_docker_args=extra_docker_args,
                 container_runtime=container_runtime,
-                apptainer_image_cache_dir=apptainer_image_cache_dir,
             ).rstrip("\n")
             + "\n"
         )
@@ -383,6 +378,7 @@ class LocalExecutor(BaseExecutor):
                         "output_dir": str(evaluation_task["output_dir"]),
                         "container": evaluation_task["client_container_name"],
                         "eval_image": evaluation_task["eval_image"],
+                        "container_runtime": container_runtime,  # Store container runtime
                     },
                     config=OmegaConf.to_object(cfg),
                 )
@@ -573,7 +569,7 @@ class LocalExecutor(BaseExecutor):
 
         Raises:
             ValueError: If job is not found or invalid.
-            RuntimeError: If Docker container cannot be stopped.
+            RuntimeError: If container cannot be stopped.
         """
         db = ExecutionDB()
         job_data = db.get_job(job_id)
@@ -591,11 +587,15 @@ class LocalExecutor(BaseExecutor):
         if not container_name:
             raise ValueError(f"No container name found for job {job_id}")
 
+        # Get container runtime from job data, default to docker for backward compatibility
+        container_runtime = job_data.data.get("container_runtime", "docker")
+        container_cmd = "podman-hpc" if container_runtime == "podman-hpc" else "docker"
+
         killed_something = False
 
-        # First, try to stop the Docker container if it's running
+        # Stop the container if it's running (docker and podman-hpc use stop command)
         result = subprocess.run(
-            shlex.split(f"docker stop {container_name}"),
+            shlex.split(f"{container_cmd} stop {container_name}"),
             capture_output=True,
             text=True,
             timeout=30,
@@ -604,9 +604,9 @@ class LocalExecutor(BaseExecutor):
             killed_something = True
         # Don't raise error if container doesn't exist (might be still pulling)
 
-        # Find and kill Docker processes for this container
+        # Find and kill container processes
         result = subprocess.run(
-            shlex.split(f"pkill -f 'docker run.*{container_name}'"),
+            shlex.split(f"pkill -f '{container_cmd} run.*{container_name}'"),
             capture_output=True,
             text=True,
             timeout=10,
