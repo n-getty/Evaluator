@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Aurora-specific lmms-eval launcher config.
+# Assumes a multimodal vLLM endpoint is already running at ENDPOINT_URL
+# (set by run_lmms_aurora.sh or equivalent).
+#
+# Container is the locally-built SIF at /flare/ModCon/ngetty/containers/lmms-eval.sif
+# (see containers/lmms-eval/lmms-eval.def). The local executor's ensure_image()
+# detects file paths in mapping.toml and uses them in place.
+
+defaults:
+  - execution: local
+  - deployment: none
+  - _self_
+
+execution:
+  type: local
+  output_dir: lmms_results
+  container_runtime: apptainer
+  apptainer_image_cache_dir: /tmp/nemo-evaluator-apptainer
+
+target:
+  api_endpoint:
+    model_id: ${oc.env:SERVED_MODEL_NAME,qwen2vl}
+    url: ${oc.env:ENDPOINT_URL}
+    type: chat
+    api_key_name: OPENAI_API_KEY
+
+evaluation:
+  nemo_evaluator_config:
+    config:
+      params:
+        request_timeout: 3600
+        parallelism: 8
+    target:
+      api_endpoint:
+        adapter_config:
+          use_reasoning: false
+          use_system_prompt: false
+  tasks:
+    - name: mmmu_val
+      nemo_evaluator_config:
+        config:
+          params:
+            temperature: 0.0
+            max_new_tokens: 4096

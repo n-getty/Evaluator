@@ -112,3 +112,8 @@ container = "nvcr.io/nvidia/eval-factory/mteb:26.03"
 [aa-lcr]
 container = "nvcr.io/nvidia/eval-factory/aa-lcr:26.03"
 # container-digest:sha256:c1abe4e1832a2a7783153ab9547cfec59fc616f57ad4400a775eaad0d0fd53bc
+
+[lmms-eval]
+container = "/flare/ModCon/ngetty/containers/lmms-eval.sif"
+# container-digest: local SIF on /flare; built from containers/lmms-eval/lmms-eval.def.
+# Aurora-only: no public registry (apptainer can exec the SIF path directly).
