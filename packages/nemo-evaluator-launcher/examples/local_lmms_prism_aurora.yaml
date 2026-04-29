@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Aurora end-to-end demo config: nemo-evaluator-launcher drives the lmms-eval
+# Apptainer container against a PRISM OpenAI-compatible endpoint.
+#
+# Assumes the PRISM uvicorn server (BaseMM_PRISM/src/api/server.py) is already
+# running and reachable at ENDPOINT_URL. Brought up by
+# scripts/run_nemo_lmms_prism_aurora.sh.
+#
+# Container is the locally-built SIF on /flare; mapped from
+# nemo_evaluator_launcher/resources/mapping.toml [lmms-eval].
+
+defaults:
+  - execution: local
+  - deployment: none
+  - _self_
+
+execution:
+  type: local
+  output_dir: lmms_prism_results
+  container_runtime: apptainer
+  apptainer_image_cache_dir: /tmp/nemo-evaluator-apptainer
+
+target:
+  api_endpoint:
+    model_id: ${oc.env:SERVED_MODEL_NAME,prism-mm-v1}
+    url: ${oc.env:ENDPOINT_URL}
+    type: chat
+    api_key_name: OPENAI_API_KEY
+
+evaluation:
+  nemo_evaluator_config:
+    config:
+      params:
+        request_timeout: 3600
+        parallelism: 1
+    target:
+      api_endpoint:
+        adapter_config:
+          use_reasoning: false
+          use_system_prompt: false
+  tasks:
+    - name: pope_random
+      nemo_evaluator_config:
+        config:
+          params:
+            temperature: 0.0
+            max_new_tokens: 64
+            limit_samples: 5
